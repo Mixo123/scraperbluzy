@@ -3,34 +3,53 @@ require 'db_connect.php';
 
 check_auth();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_favorites'])) {
-    $stmt = $pdo->prepare("INSERT INTO offers 
-        (user_id, title, price, url, image) 
-        VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $_SESSION['user_id'],
-        $_POST['title'],
-        $_POST['price'],
-        $_POST['url'],
-        $_POST['image']
-    ]);
-}
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true);
 
-$url = 'https://www.olx.pl/api/v1/offers?offset=0&limit=40&category_id=2586&sort_by=created_at:desc&filter_enum_fashionbrand[0]=adidas&filter_enum_fashionbrand[1]=nike&filter_enum_fashionbrand[2]=puma&filter_float_price:to=50';
+    if (isset($input['add_to_favorites'])) {
+        try {
+            $required = ['title', 'price', 'url', 'image', 'gender'];
+            foreach ($required as $field) {
+                if (!isset($input[$field])) {
+                    throw new Exception("Brakujące pole: $field");
+                }
+            }
 
-$options = [
-    'http' => [
-        'method' => 'GET',
-        'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\r\n"
-    ]
-];
+            $stmt = $pdo->prepare("INSERT INTO offers 
+                (user_id, title, price, url, image, gender) 
+                VALUES (?, ?, ?, ?, ?, ?)");
+                
+            $stmt->execute([
+                $_SESSION['user_id'],
+                $input['title'],
+                $input['price'],
+                $input['url'],
+                $input['image'],
+                $input['gender']
+            ]);
 
-try {
-    $context = stream_context_create($options);
-    $response = file_get_contents($url, false, $context);
-    $data = json_decode($response, true);
-} catch (Exception $e) {
-    die('Error: ' . $e->getMessage());
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'success']);
+            exit;
+
+        } catch(PDOException $e) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Błąd bazy danych: ' . $e->getMessage()
+            ]);
+            exit;
+        } catch(Exception $e) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
+            exit;
+        }
+    }
 }
 ?>
 
@@ -41,52 +60,40 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OLX Scraper</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .filter-btn {
+            transition: all 0.3s ease;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
     <?php require_once 'navbar.php'; ?>
+
+    <script>
+        const USER_ID = <?= json_encode($_SESSION['user_id'] ?? 0, JSON_HEX_TAG) ?>;
+    </script>
     
     <div class="container mx-auto p-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <?php foreach ($data['data'] as $offer): ?>
-                <?php 
-                    $title = htmlspecialchars($offer['title'] ?? 'Brak tytułu');
-                    $price = 'Cena do negocjacji';
-                    foreach ($offer['params'] as $param) {
-                        if ($param['key'] === 'price' && isset($param['value']['label'])) {
-                            $price = htmlspecialchars($param['value']['label']);
-                            break;
-                        }
-                    }
-                    
-                    $url = htmlspecialchars($offer['url'] ?? '#');
-                    $image = 'https://via.placeholder.com/300x200?text=Brak+zdjęcia';
-                    if (!empty($offer['photos'][0]['link'])) {
-                        $image = str_replace('{width}x{height}', '800x600', $offer['photos'][0]['link']);
-                        $image = htmlspecialchars($image);
-                    }
-                ?>
-
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <img src="<?= $image ?>" alt="<?= $title ?>" class="w-full h-48 object-cover">
-                    <div class="p-4">
-                        <h3 class="text-lg font-semibold mb-2"><?= $title ?></h3>
-                        <div class="text-green-600 font-bold mb-2"><?= $price ?></div>
-                        <div class="flex justify-between items-center">
-                            <a href="<?= $url ?>" target="_blank" class="text-blue-600 hover:text-blue-800">Zobacz ofertę</a>
-                            <form method="POST">
-                                <input type="hidden" name="title" value="<?= $title ?>">
-                                <input type="hidden" name="price" value="<?= $price ?>">
-                                <input type="hidden" name="url" value="<?= $url ?>">
-                                <input type="hidden" name="image" value="<?= $image ?>">
-                                <button type="submit" name="add_to_favorites" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                                    ♥ Dodaj do ulubionych
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+        <div class="flex gap-4 mb-6" id="filters">
+            <button data-gender="all" class="filter-btn bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md">
+                Wszystkie
+            </button>
+            <button data-gender="female" class="filter-btn bg-white px-4 py-2 rounded-lg shadow-md">
+                Damskie
+            </button>
+            <button data-gender="male" class="filter-btn bg-white px-4 py-2 rounded-lg shadow-md">
+                Męskie
+            </button>
         </div>
+        
+        <script>
+            const USER_ID = <?= json_encode($_SESSION['user_id'] ?? 0) ?>;
+        </script>
+
+        <h2 class="text-2xl font-bold mb-4" id="sectionTitle">🔥 Wszystkie oferty</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="offersContainer"></div>
     </div>
+
+    <script src="main.js"></script>
 </body>
 </html>
