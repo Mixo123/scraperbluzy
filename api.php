@@ -5,8 +5,8 @@ check_auth();
 header('Content-Type: application/json');
 
 $urls = [
-    'female' => 'https://www.olx.pl/api/v1/offers?offset=0&limit=40&category_id=2534&sort_by=created_at:desc&filter_enum_fashionbrand[0]=adidas&filter_enum_fashionbrand[1]=nike&filter_enum_fashionbrand[2]=puma&filter_float_price:to=50',
-    'male' => 'https://www.olx.pl/api/v1/offers?offset=0&limit=40&category_id=2586&sort_by=created_at:desc&filter_enum_fashionbrand[0]=adidas&filter_enum_fashionbrand[1]=nike&filter_enum_fashionbrand[2]=puma&filter_float_price:to=50'
+    'female' => 'https://www.olx.pl/api/v1/offers?offset=0&limit=40&category_id=2534&sort_by=filter_float_price:asc&filter_enum_fashionbrand[0]=adidas&filter_enum_fashionbrand[1]=nike&filter_enum_fashionbrand[2]=puma&filter_float_price:to=20',
+    'male' => 'https://www.olx.pl/api/v1/offers?offset=0&limit=40&category_id=2586&sort_by=filter_float_price:asc&filter_enum_fashionbrand[0]=adidas&filter_enum_fashionbrand[1]=nike&filter_enum_fashionbrand[2]=puma&filter_float_price:to=20'
 ];
 
 $options = [
